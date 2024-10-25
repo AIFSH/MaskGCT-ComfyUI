@@ -1,0 +1,15 @@
+librosa
+py3langid
+ruamel_yaml
+pydub
+LangSegment
+much
+accelerate
+pyopenjtalk
+pykakasi
+jieba 
+cn2an
+pypinyin
+onnxruntime
+phonemizer
+unidecode
