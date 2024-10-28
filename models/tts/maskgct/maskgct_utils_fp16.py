@@ -16,7 +16,6 @@ import accelerate
 import safetensors
 from utils.util import load_config
 from tqdm import tqdm
-
 from models.codec.kmeans.repcodec_model import RepCodec
 from models.tts.maskgct.maskgct_s2a import MaskGCT_S2A
 from models.tts.maskgct.maskgct_t2s import MaskGCT_T2S
@@ -38,33 +37,33 @@ def g2p_(text, language):
 def build_t2s_model(cfg, device):
     t2s_model = MaskGCT_T2S(cfg=cfg)
     t2s_model.eval()
-    t2s_model.to(device)
+    t2s_model.to(device,dtype=torch.float16)
     return t2s_model
 
 
 def build_s2a_model(cfg, device):
     soundstorm_model = MaskGCT_S2A(cfg=cfg)
     soundstorm_model.eval()
-    soundstorm_model.to(device)
+    soundstorm_model.to(device,dtype=torch.float16)
     return soundstorm_model
 
 
 def build_semantic_model(device,wav2vec_path):
     semantic_model = Wav2Vec2BertModel.from_pretrained(wav2vec_path)
     semantic_model.eval()
-    semantic_model.to(device)
+    semantic_model.to(device,dtype=torch.float16)
     stat_mean_var = torch.load(os.path.join(os.path.dirname(__file__),"ckpt/wav2vec2bert_stats.pt"))
     semantic_mean = stat_mean_var["mean"]
     semantic_std = torch.sqrt(stat_mean_var["var"])
-    semantic_mean = semantic_mean.to(device)
-    semantic_std = semantic_std.to(device)
+    semantic_mean = semantic_mean.to(device,dtype=torch.float16)
+    semantic_std = semantic_std.to(device,dtype=torch.float16)
     return semantic_model, semantic_mean, semantic_std
 
 
 def build_semantic_codec(cfg, device):
     semantic_codec = RepCodec(cfg=cfg)
     semantic_codec.eval()
-    semantic_codec.to(device)
+    semantic_codec.to(device,dtype=torch.float16)
     return semantic_codec
 
 
@@ -73,8 +72,8 @@ def build_acoustic_codec(cfg, device):
     codec_decoder = CodecDecoder(cfg=cfg.decoder)
     codec_encoder.eval()
     codec_decoder.eval()
-    codec_encoder.to(device)
-    codec_decoder.to(device)
+    codec_encoder.to(device,dtype=torch.float16)
+    codec_decoder.to(device,dtype=torch.float16)
     return codec_encoder, codec_decoder
 
 
@@ -169,10 +168,10 @@ class MaskGCT_Inference_Pipeline:
         phone_id = torch.cat([prompt_phone_id, target_phone_id])
 
         input_features, attention_mask = self.extract_features(prompt_speech)
-        input_features = input_features.unsqueeze(0).to(self.device)
+        input_features = input_features.unsqueeze(0).to(self.device,dtype=torch.float16)
         attention_mask = attention_mask.unsqueeze(0).to(self.device)
         semantic_code, _ = self.extract_semantic_code(input_features, attention_mask)
-
+        semantic_code = semantic_code.to(self.device,dtype=torch.float16)
         predict_semantic = self.t2s_model.reverse_diffusion(
             semantic_code[:, :],
             target_len,
@@ -212,7 +211,7 @@ class MaskGCT_Inference_Pipeline:
             n_timesteps=n_timesteps[:1],
             cfg=cfg,
             rescale_cfg=rescale_cfg,
-        )
+        ).to(self.device,dtype=torch.float16)
 
         cond = self.s2a_model_full.cond_emb(semantic_code)
         prompt = acoustic_code[:, :, :]
@@ -225,15 +224,15 @@ class MaskGCT_Inference_Pipeline:
             cfg=cfg,
             rescale_cfg=rescale_cfg,
             gt_code=predict_1layer,
-        )
+        ).to(self.device,dtype=torch.float16)
 
         vq_emb = self.codec_decoder.vq2emb(
             predict_full.permute(2, 0, 1), n_quantizers=12
-        )
+        ).to(self.device,dtype=torch.float16)
         recovered_audio = self.codec_decoder(vq_emb)
         prompt_vq_emb = self.codec_decoder.vq2emb(
             prompt.permute(2, 0, 1), n_quantizers=12
-        )
+        ).to(self.device,dtype=torch.float16)
         recovered_prompt_audio = self.codec_decoder(prompt_vq_emb)
         recovered_prompt_audio = recovered_prompt_audio[0][0].cpu().numpy()
         recovered_audio = recovered_audio[0][0].cpu().numpy()
@@ -270,8 +269,9 @@ class MaskGCT_Inference_Pipeline:
             cfg,
             rescale_cfg,
         )
+        combine_semantic_code=combine_semantic_code.to(self.device,dtype=torch.float16)
         acoustic_code = self.extract_acoustic_code(
-            torch.tensor(speech).unsqueeze(0).to(self.device)
+            torch.tensor(speech).unsqueeze(0).to(self.device,dtype=torch.float16)
         )
         _, recovered_audio = self.semantic2acoustic(
             combine_semantic_code,

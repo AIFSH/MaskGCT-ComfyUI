@@ -99,6 +99,7 @@ class MaskGCTNode:
             semantic_mean,
             semantic_std,
             device,
+            wav2vec_dir
         )
         # inference
         print("Converting audio...")
@@ -141,6 +142,8 @@ class MaskGCTNode:
                 return_timestamps=False,
             )["text"].strip()
             print("Finished transcription")
+            del pipe
+            torch.cuda.empty_cache()
         prompt_lang, _ = langid.classify(prompt_text)
         print(f"prompt_language:{prompt_lang}")
 

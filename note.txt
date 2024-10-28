@@ -1,0 +1,4 @@
+if "jp" in voice_name:
+    voice_name = "jpx/ja"
+
+in Python/Lib/site-packages/phonemizer/backend/espeak/wrapper.py 248

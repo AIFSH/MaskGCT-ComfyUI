@@ -117,7 +117,7 @@ def chn_eng_g2p(text: str):
 now_dir = os.path.dirname(os.path.abspath(__file__))
 vocab_path = os.path.join(now_dir,"g2p/vocab.json")
 text_tokenizer = PhonemeBpeTokenizer(vocab_path)
-with open(vocab_path, "r") as f:
+with open(vocab_path, "r",encoding="utf-8") as f:
     json_data = f.read()
 data = json.loads(json_data)
 vocab = data["vocab"]

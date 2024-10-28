@@ -13,3 +13,4 @@ pypinyin
 onnxruntime
 phonemizer
 unidecode
+json5
