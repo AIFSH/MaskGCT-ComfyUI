@@ -1,6 +1,15 @@
 # MaskGCT-ComfyUI
 a custom node for [MaskGCT](https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/README.md) to Zero-Shot Text-to-Speech
 
+## Weights
+weights will download from hf automatically,对于国内用户，你可以手动下载后，解压到ComfyUI/models/AIFSH文件夹，[下载地址MaskGCT](https://pan.quark.cn/s/f1b5a38e16dc),[下载地址w2v-bert-2.0.zip](https://pan.quark.cn/s/534d39e78610),[下载地址whisper-large-v3-turbo](https://pan.quark.cn/s/27ee36b1046b)
+
+## Debug for espeak-ng on Windows
+- [使用开箱即用的整合包](https://b23.tv/e6gQ9ms)
+  - [使用演示](https://www.bilibili.com/video/BV1JSSxYuEfu)
+  - 1键包1次充电31天免费更新，内含Ultralight-Digital-Human，GLM-4-Voice,MaskGCT，F5-TTS，FireRedTTS，hallo2，JoyHallo，SeedVC八个AIFSH的节点，持续更新中
+- 我花费了1天时间debug， debug时间仅供参考，或许你更厉害呢，试试吧
+
 ## Example
 |target_text|prompt_wav|result_wav|
 |--|--|--|
