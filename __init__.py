@@ -1,8 +1,11 @@
 import sys
 import os.path as osp
+
+import safetensors.torch
 now_dir = osp.dirname(osp.abspath(__file__))
 sys.path.append(now_dir)
 comfy_utils = sys.modules["utils"]
+import time
 import os
 import shutil
 import torch
@@ -27,6 +30,48 @@ wav2vec_dir = osp.join(aifsh_models,"w2v-bert-2.0")
 tmp_dir = osp.join(now_dir, "tmp")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sys.modules["utils"] = comfy_utils
+
+def load_models():
+    cfg_path = osp.join(now_dir,"models/tts/maskgct/config/maskgct.json")
+    cfg = load_config(cfg_path)
+    # 1. build semantic model (w2v-bert-2.0)
+    semantic_model, semantic_mean, semantic_std = build_semantic_model(device,wav2vec_dir)
+    # 2. build semantic codec
+    semantic_codec = build_semantic_codec(cfg.model.semantic_codec, device)
+    # 3. build acoustic codec
+    codec_encoder, codec_decoder = build_acoustic_codec(cfg.model.acoustic_codec, device)
+    # 4. build t2s model
+    t2s_model = build_t2s_model(cfg.model.t2s_model, device)
+    # 5. build s2a model
+    s2a_model_1layer = build_s2a_model(cfg.model.s2a_model.s2a_1layer, device)
+    s2a_model_full =  build_s2a_model(cfg.model.s2a_model.s2a_full, device)
+
+    # load semantic codec
+    safetensors.torch.load_model(semantic_codec, osp.join(maskgct_dir,"semantic_codec/model.safetensors"))
+    # load acoustic codec
+    safetensors.torch.load_model(codec_encoder, osp.join(maskgct_dir,"acoustic_codec/model.safetensors"))
+    safetensors.torch.load_model(codec_decoder, osp.join(maskgct_dir,"acoustic_codec/model_1.safetensors"))
+    # load t2s model
+    safetensors.torch.load_model(t2s_model, osp.join(maskgct_dir,"t2s_model/model.safetensors"))
+    # load s2a model
+    safetensors.torch.load_model(s2a_model_1layer,osp.join(maskgct_dir,"s2a_model/s2a_model_1layer/model.safetensors"))
+    safetensors.torch.load_model(s2a_model_full, osp.join(maskgct_dir,"s2a_model/s2a_model_full/model.safetensors"))
+
+    maskgct_inference_pipeline = MaskGCT_Inference_Pipeline(
+        semantic_model,
+        semantic_codec,
+        codec_encoder,
+        codec_decoder,
+        t2s_model,
+        s2a_model_1layer,
+        s2a_model_full,
+        semantic_mean,
+        semantic_std,
+        device,
+        wav2vec_dir
+    )
+    return maskgct_inference_pipeline
+    
 class MaskGCTNode:
     def __init__(self):
         if not osp.exists(osp.join(maskgct_dir,"s2a_model/s2a_model_full/model.safetensors")):
@@ -40,12 +85,19 @@ class MaskGCTNode:
         if not osp.exists(osp.join(wav2vec_dir,"model.safetensors")):
             snapshot_download(repo_id="facebook/w2v-bert-2.0",local_dir=wav2vec_dir,
                               ignore_patterns=["*.pt"])
+        self.pipe = None
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required":{
                 "target_text":("TEXT",),
                 "prompt_wav":("AUDIO",),
+                "store_in_varm":("BOOLEAN",{
+                    "default":False
+                }),
+                "seed":("INT",{
+                    "default": 42,
+                })
             },
             "optional":{
                 "prompt_text":("TEXT",),
@@ -61,46 +113,11 @@ class MaskGCTNode:
 
     CATEGORY = "AIFSH_MaskGCT"
 
-    def gen_audio(self,target_text,prompt_wav,prompt_text=None):
+    def gen_audio(self,target_text,prompt_wav,store_in_varm,seed,prompt_text=None):
         # build model
-        cfg_path = osp.join(now_dir,"models/tts/maskgct/config/maskgct.json")
-        cfg = load_config(cfg_path)
-        # 1. build semantic model (w2v-bert-2.0)
-        semantic_model, semantic_mean, semantic_std = build_semantic_model(device,wav2vec_dir)
-        # 2. build semantic codec
-        semantic_codec = build_semantic_codec(cfg.model.semantic_codec, device)
-        # 3. build acoustic codec
-        codec_encoder, codec_decoder = build_acoustic_codec(cfg.model.acoustic_codec, device)
-        # 4. build t2s model
-        t2s_model = build_t2s_model(cfg.model.t2s_model, device)
-        # 5. build s2a model
-        s2a_model_1layer = build_s2a_model(cfg.model.s2a_model.s2a_1layer, device)
-        s2a_model_full =  build_s2a_model(cfg.model.s2a_model.s2a_full, device)
-
-        # load semantic codec
-        safetensors.torch.load_model(semantic_codec, osp.join(maskgct_dir,"semantic_codec/model.safetensors"))
-        # load acoustic codec
-        safetensors.torch.load_model(codec_encoder, osp.join(maskgct_dir,"acoustic_codec/model.safetensors"))
-        safetensors.torch.load_model(codec_decoder, osp.join(maskgct_dir,"acoustic_codec/model_1.safetensors"))
-        # load t2s model
-        safetensors.torch.load_model(t2s_model, osp.join(maskgct_dir,"t2s_model/model.safetensors"))
-        # load s2a model
-        safetensors.torch.load_model(s2a_model_1layer,osp.join(maskgct_dir,"s2a_model/s2a_model_1layer/model.safetensors"))
-        safetensors.torch.load_model(s2a_model_full, osp.join(maskgct_dir,"s2a_model/s2a_model_full/model.safetensors"))
-
-        maskgct_inference_pipeline = MaskGCT_Inference_Pipeline(
-            semantic_model,
-            semantic_codec,
-            codec_encoder,
-            codec_decoder,
-            t2s_model,
-            s2a_model_1layer,
-            s2a_model_full,
-            semantic_mean,
-            semantic_std,
-            device,
-            wav2vec_dir
-        )
+        torch.manual_seed(seed)
+        if self.pipe is None:
+            self.pipe = load_models()
         # inference
         print("Converting audio...")
         os.makedirs(tmp_dir,exist_ok=True)
@@ -147,7 +164,7 @@ class MaskGCTNode:
         prompt_lang, _ = langid.classify(prompt_text)
         print(f"prompt_language:{prompt_lang}")
 
-        if len(prompt_text.encode('utf-8')) == len(prompt_text) and len(gen_text.encode('utf-8')) == len(gen_text):
+        if len(prompt_text.encode('utf-8')) == len(prompt_text) and len(target_text.encode('utf-8')) == len(target_text):
             max_chars = 400-len(prompt_text.encode('utf-8'))
         else:
             max_chars = 300-len(prompt_text.encode('utf-8'))
@@ -157,7 +174,7 @@ class MaskGCTNode:
         audio_list = []
         for i, gen_text in enumerate(tqdm(gen_text_batches)):
             print(f'gen_text {i+1}', gen_text)
-            recovered_audio = maskgct_inference_pipeline.maskgct_inference(prompt_speech_path=ref_audio,
+            recovered_audio = self.pipe.maskgct_inference(prompt_speech_path=ref_audio,
                                                                         prompt_text=prompt_text,
                                                                         target_text=gen_text,
                                                                         language=prompt_lang,
@@ -171,6 +188,9 @@ class MaskGCTNode:
             "sample_rate":24000
         }
         shutil.rmtree(tmp_dir)
+        if not store_in_varm:
+            self.pipe = None
+            torch.cuda.empty_cache()
         return (res_audio,)
 
 NODE_CLASS_MAPPINGS = {
