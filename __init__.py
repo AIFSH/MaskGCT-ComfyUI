@@ -92,11 +92,18 @@ class MaskGCTNode:
             "required":{
                 "target_text":("TEXT",),
                 "prompt_wav":("AUDIO",),
-                "store_in_varm":("BOOLEAN",{
-                    "default":False
+                "target_len":("FLOAT",{
+                    "default":0,
                 }),
-                "seed":("INT",{
-                    "default": 42,
+                "cfg":("FLOAT",{
+                    "default":2.5,
+                }),
+                "rescale_cfg":("FLOAT",{
+                    "default":0.75,
+                    "rond":0.001,
+                }),
+                "store_in_varm":("BOOLEAN",{
+                    "default":True
                 })
             },
             "optional":{
@@ -113,9 +120,9 @@ class MaskGCTNode:
 
     CATEGORY = "AIFSH_MaskGCT"
 
-    def gen_audio(self,target_text,prompt_wav,store_in_varm,seed,prompt_text=None):
+    def gen_audio(self,target_text,prompt_wav,target_len,cfg,rescale_cfg,
+                  store_in_varm,prompt_text=None):
         # build model
-        torch.manual_seed(seed)
         if self.pipe is None:
             self.pipe = load_models()
         # inference
@@ -164,21 +171,30 @@ class MaskGCTNode:
         prompt_lang, _ = langid.classify(prompt_text)
         print(f"prompt_language:{prompt_lang}")
 
+        '''
         if len(prompt_text.encode('utf-8')) == len(prompt_text) and len(target_text.encode('utf-8')) == len(target_text):
             max_chars = 400-len(prompt_text.encode('utf-8'))
         else:
             max_chars = 300-len(prompt_text.encode('utf-8'))
+        '''
+        max_chars=200
         gen_text_batches = split_text_into_batches(target_text, max_chars=max_chars)
         print(f'ref_text\t{prompt_text}\n max_chars:{max_chars}')
         # gen_text_batches = text_list_normalize(gen_text_batches)
         audio_list = []
+        if target_len < 0.3:
+            target_len = None
         for i, gen_text in enumerate(tqdm(gen_text_batches)):
             print(f'gen_text {i+1}', gen_text)
             recovered_audio = self.pipe.maskgct_inference(prompt_speech_path=ref_audio,
                                                                         prompt_text=prompt_text,
                                                                         target_text=gen_text,
                                                                         language=prompt_lang,
-                                                                        target_language=target_lang)
+                                                                        target_language=target_lang,
+                                                                        target_len=target_len,
+                                                                        cfg=cfg,
+                                                                        rescale_cfg=rescale_cfg
+                                                                        )
             audio_list.append(recovered_audio)
         
         waveform = torch.from_numpy(np.concatenate(audio_list)).unsqueeze(0).unsqueeze(0)
