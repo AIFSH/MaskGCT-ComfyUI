@@ -9,7 +9,8 @@ weights will download from hf automatically,对于国内用户，你可以手动
   - [使用演示](https://www.bilibili.com/video/BV1JSSxYuEfu)
   - 1键包1次充电31天免费更新，内含Ultralight-Digital-Human，GLM-4-Voice,MaskGCT，F5-TTS，FireRedTTS，hallo2，JoyHallo，SeedVC八个AIFSH的节点，持续更新中
 - 我花费了1天时间debug， debug时间仅供参考，或许你更厉害呢，试试吧
-
+## Disclaimer / 免责声明
+We do not hold any responsibility for any illegal usage of the codebase. Please refer to your local laws about DMCA and other related laws. 我们不对代码库的任何非法使用承担任何责任. 请参阅您当地关于 DMCA (数字千年法案) 和其他相关法律法规.
 ## Example
 |target_text|prompt_wav|result_wav|
 |--|--|--|
