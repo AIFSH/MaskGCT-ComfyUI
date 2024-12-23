@@ -1,0 +1,15 @@
+[project]
+name = "maskgct-comfyui"
+description = "a custom node for [a/MaskGCT](https://github.com/open-mmlab/Amphion/blob/main/models/tts/maskgct/README.md) to Zero-Shot Text-to-Speech"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["librosa", "py3langid", "ruamel_yaml", "pydub", "LangSegment", "much", "accelerate", "pyopenjtalk", "pykakasi", "jieba", "cn2an", "pypinyin", "onnxruntime", "phonemizer", "unidecode", "json5"]
+
+[project.urls]
+Repository = "https://github.com/AIFSH/MaskGCT-ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "MaskGCT-ComfyUI"
+Icon = ""
